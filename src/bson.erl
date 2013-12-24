@@ -3,13 +3,14 @@
 
 -export_type ([maybe/1]).
 -export_type ([document/0, label/0, value/0]).
+-export_type ([arr/0]).
 -export_type ([bin/0, bfunction/0, uuid/0, md5/0, userdefined/0]).
 -export_type ([mongostamp/0, minmaxkey/0]).
--export_type ([regex/0, unixtime/0]).
+-export_type ([utf8/0, regex/0, unixtime/0]).
 -export_type ([javascript/0]).
 -export_type ([objectid/0, unixsecs/0]).
 
--export ([lookup/2, lookup/3, at/2, include/2, exclude/2, update/3, merge/2, append/2]).
+-export ([lookup/2, lookup/3, at/2, include/2, exclude/2, update/3, merge/2, merge/3, append/2]).
 -export ([doc_foldl/3, doc_foldr/3, fields/1, document/1]).
 -export ([utf8/1, str/1]).
 -export ([timenow/0, ms_precision/1, secs_to_unixtime/1, unixtime_to_secs/1]).
@@ -118,6 +119,13 @@ update (Label, Value, Document) -> case find (Label, Document) of
 merge (UpDoc, BaseDoc) ->
 	Fun = fun (Label, Value, Doc) -> update (Label, Value, Doc) end,
 	doc_foldl (Fun, BaseDoc, UpDoc).
+
+-spec merge (document(), document(), fun((label(), value(), value()) -> value())) -> document().
+merge(UpDoc, BaseDoc, Fun) ->
+	Dict1 = orddict:from_list(bson:fields(UpDoc)),
+	Dict2 = orddict:from_list(bson:fields(BaseDoc)),
+	bson:document(orddict:merge(Fun, Dict1, Dict2)).
+
 
 -spec append (document(), document()) -> document().
 %@doc Append two documents together
@@ -230,3 +238,40 @@ objectid (UnixSecs, MachineAndProcId, Count) ->
 -spec objectid_time (objectid()) -> unixtime().
 %@doc Time when object id was generated
 objectid_time ({<<UnixSecs:32/big, _:64>>}) -> secs_to_unixtime (UnixSecs).
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+bson_test() ->
+	Doc = {b, {x, 2, y, 3},
+		   a, 1,
+		   c, [mon, tue, wed]},
+	{1} = bson:lookup (a, Doc),
+	{} = bson:lookup (d, Doc),
+	2 = bson:lookup (d, Doc, 2),
+	1 = bson:lookup (a, Doc, 3),
+	1 = bson:at (a, Doc),
+	{'EXIT', {missing_field, _}} = (catch bson:at (d, Doc)),
+	{a, 1} = bson:include ([a], Doc),
+	{a, 1} = bson:exclude ([b,c], Doc),
+	{b, {x, 2, y, 3}, a, 1, c, 4.2} = bson:update (c, 4.2, Doc),
+	{b, 0, a, 1, c, 2, d, 3} = bson:merge ({c, 2, d, 3, b, 0}, Doc),
+	{a, 1, b, {x, 2, y, 3}, c, 2, d, 3} = bson:merge ({c, 2, d, 3, b, 0}, Doc, fun
+		(b, _Value1, Value2) -> Value2;
+		(c, Value1, _Value2) -> Value1
+	end),
+	{a, 1, b, 2, c, 3, d, 4} = bson:append ({a, 1, b, 2}, {c, 3, d, 4}),
+	[{b, {x, 2, y, 3}}, {a, 1}, {c, [mon, tue, wed]}] = bson:fields (Doc).
+
+time_test() ->
+	{MegaSecs, Secs, _} = bson:timenow(),
+	{MegaSecs, Secs, 0} = bson:secs_to_unixtime (bson:unixtime_to_secs ({MegaSecs, Secs, 0})).
+
+objectid_test() ->
+	{<<1:32/big, 2:24/big, 3:16/big, 4:24/big>>} = bson:objectid (1, <<2:24/big, 3:16/big>>, 4),
+	UnixSecs = bson:unixtime_to_secs (bson:timenow()),
+	UnixTime = bson:objectid_time (bson:objectid (UnixSecs, <<2:24/big, 3:16/big>>, 4)),
+	UnixSecs = bson:unixtime_to_secs (UnixTime).
+
+-endif.
