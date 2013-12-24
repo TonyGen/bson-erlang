@@ -1,7 +1,9 @@
 %% ex: ts=4 sw=4 noexpandtab syntax=erlang
-{application, bson, [
+{application, bson, 
+ [
   {description, "BSON are JSON-like objects with a standard binary serialization. See bsonspec.org"},
-  {vsn, git},
+  {vsn, "1"},
   {registered, []},
+  {modules, []},
   {applications, [kernel, stdlib]}
 ]}.
