@@ -34,12 +34,16 @@ binary_test() ->
 	Bin = bson_binary:put_document (Doc),
 	Bin = <<49,0,0,0,4,66,83,79,78,0,38,0,0,0,2,48,0,8,0,0,0,97,119,101,115,111,109,101,0,1,49,0,51,51,51,51,51,51,20,64,16,50,0,194,7,0,0,0,0>>,
 	VBin = <<200,12,240,129,100,90,56,198,34,0,0>>,
+  % \x06\x00\x00\x00 (binary length) 0x02 (subtype) \x02\x00\x00\x00
+  % (inner length - "extra") ab (data)
+	OldBin = <<6,0,0,0,2,2,0,0,0,97,98>>,
 	Time = bson:timenow(),
 	Doc1 = {a, -4.230845,
 			b, <<"hello">>,
 			c, {x, -1, y, 2.2001},
 			d, [23, 45, 200],
 			eeeeeeeee, {bin, bin, VBin},
+			e2, {bin, oldbin, OldBin},
 			f, {bin, function, VBin},
 			g, {bin, uuid, Bin},
 			h, {bin, md5, VBin},
